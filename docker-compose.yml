@@ -1,0 +1,95 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16
+    container_name: reviews-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: reviews-localstack
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: ${AWS_REGION}
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:4566/_localstack/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - "localstack:/var/lib/localstack"
+
+  s3-setup:
+    image: amazon/aws-cli:2.15.0
+    container_name: reviews-s3-setup
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PREFIX: ${S3_PREFIX}
+    entrypoint: ["/bin/sh","-c"]
+    command: >
+      'set -e;
+       ENDPOINT=http://localstack:4566;
+       aws --endpoint-url=$$ENDPOINT s3 mb s3://$$S3_BUCKET || true;
+       if [ -f /bootstrap/review.jl ]; then
+         aws --endpoint-url=$$ENDPOINT s3 cp /bootstrap/review.jl s3://$$S3_BUCKET/${S3_PREFIX}review-1.jl;
+       fi;
+       echo "Bootstrap complete."'
+    volumes:
+      - ./bootstrap:/bootstrap:ro
+
+  app:
+    build: .
+    container_name: review-service
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      s3-setup:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PREFIX: ${S3_PREFIX}
+      AWS_S3_ENDPOINT: http://localstack:4566
+      API_KEY: ${API_KEY}
+      INGEST_DELAY_MS: ${INGEST_DELAY_MS}   # scheduler period
+      INGEST_PARALLELISM: ${INGEST_PARALLELISM}
+      APP_INGESTION_SCHEDULE: ${APP_INGESTION_SCHEDULE}
+    ports:
+      - "8080:8080"
+    # (Optional) show only relevant logs
+    # logging:
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "3"
+
+volumes:
+  pgdata:
+  localstack:

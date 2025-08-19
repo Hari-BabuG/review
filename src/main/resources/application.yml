@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reviews
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.lob.non_contextual_creation: true
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
+
+aws:
+  region: ${AWS_REGION:ap-south-1}
+  s3:
+    bucket: ${S3_BUCKET:reviews-bucket}
+    prefix: ${S3_PREFIX:daily/} # path where .jl files appear
+    endpoint: ${AWS_S3_ENDPOINT:}
+  creds:
+    accessKey: ${AWS_ACCESS_KEY_ID:dummy}
+    secretKey: ${AWS_SECRET_ACCESS_KEY:dummy}
+
+app:
+  ingestion:
+    fixedDelayMs: ${INGEST_DELAY_MS:300000}
+    schedule: "PT5M"  # ISO-8601 duration: run every 5 minutes
+    parallelism: 4     # number of files processed concurrently
+  security:
+    apiKey: ${API_KEY}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
