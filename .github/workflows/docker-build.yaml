@@ -1,0 +1,25 @@
+name: Manual Docker Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag for Docker image (e.g. v1.0.0)'
+        required: false
+        default: 'manual'
+
+jobs:
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t review-ingestion:${{ github.event.inputs.image_tag }} .
+
+      - name: Show image details
+        run: docker images review-ingestion:${{ github.event.inputs.image_tag }}
