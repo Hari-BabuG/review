@@ -16,9 +16,17 @@ spring:
   task:
     scheduling:
       enabled: false
+  redis:
+    host: dummy
+    port: 6379
+    enabled: false
+  cache:
+    type: none
   autoconfigure:
-      exclude:
-        - org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration
+    exclude:
+      - org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 aws:
   region: us-east-1
   s3:

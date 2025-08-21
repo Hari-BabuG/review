@@ -16,6 +16,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  data:
+    redis:
+      host: redis
+      port: 6379
 
 aws:
   region: ${AWS_REGION:ap-south-1}

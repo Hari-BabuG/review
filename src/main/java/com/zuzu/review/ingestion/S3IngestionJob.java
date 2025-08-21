@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -28,14 +30,18 @@ public class S3IngestionJob {
 
 	@Value("${app.ingestion.parallelism:4}")
 	private int parallelism;
+	
+	private StringRedisTemplate redisTemplate;
 
 	public S3IngestionJob(S3Service s3Service, JsonlParser parser, ReviewService reviewService,
-			IngestionTrackerRepository tracker, @Qualifier("ingestionExecutor") Executor ingestionExecutor) {
+			IngestionTrackerRepository tracker, @Qualifier("ingestionExecutor") Executor ingestionExecutor, @Nullable StringRedisTemplate redisTemplate) {
 		this.s3Service = s3Service;
 		this.parser = parser;
 		this.reviewService = reviewService;
 		this.tracker = tracker;
 		this.ingestionExecutor = ingestionExecutor;
+		this.redisTemplate = redisTemplate;
+		
 	}
 
 	// Cron-compatible: run via fixedRate or external scheduler calling an endpoint/command
@@ -53,15 +59,32 @@ public class S3IngestionJob {
 		objects.stream().limit(1000).forEach(obj -> submitIfNew(obj));
 		log.info("pollOnce End");
 	}
-
+	
 	private void submitIfNew(S3Object obj) {
-		log.info("submitIfNew id", obj.key());
-		String fileId = obj.key();
-		tracker.findById(fileId).ifPresentOrElse(
-				existing -> log.info("Skip already tracked {} status={} ", obj.key(), existing.getStatus()),
-				() -> ((Runnable) () -> processObject(obj)).run() // inline run; replace with async if desired
-		);
+	    log.info("submitIfNew id: {}", obj.key());
+	    String fileId = obj.key();
+
+	    // Fast path: cache hit (only if Redis is available)
+	    if (redisTemplate != null && Boolean.TRUE.equals(redisTemplate.hasKey(fileId))) {
+	        log.info("Cache hit for {}, skipping ingestion", fileId);
+	        return;
+	    }
+
+	    log.info("Will hit DB for {}", fileId);
+
+	    // Cache miss: check DB
+	    tracker.findById(fileId).ifPresentOrElse(
+	        existing -> {
+	            log.info("Cache miss + DB hit for {}, skipping", fileId);
+	            if (redisTemplate != null) {
+	                redisTemplate.opsForValue().set(fileId, "SKIPPED");
+	            }
+	        },
+	        () -> ingestionExecutor.execute(() -> processObject(obj)) // proceed with ingestion
+	    );
 	}
+	
+	
 
 	@Async("ingestionExecutor")
 	@Transactional

@@ -57,6 +57,17 @@ services:
        echo "Bootstrap complete."'
     volumes:
       - ./bootstrap:/bootstrap:ro
+    
+  redis:
+      image: redis:7
+      container_name: reviews-redis
+      ports:
+        - "6379:6379"
+      healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 5s
+        timeout: 3s
+        retries: 10
 
   app:
     build: .
@@ -68,6 +79,8 @@ services:
         condition: service_healthy
       s3-setup:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
@@ -84,11 +97,6 @@ services:
       APP_INGESTION_SCHEDULE: ${APP_INGESTION_SCHEDULE}
     ports:
       - "8080:8080"
-    # (Optional) show only relevant logs
-    # logging:
-    #   options:
-    #     max-size: "10m"
-    #     max-file: "3"
 
 volumes:
   pgdata:
