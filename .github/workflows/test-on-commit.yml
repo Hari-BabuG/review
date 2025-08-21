@@ -2,7 +2,7 @@ name: Build and Test on Commit
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - '**.md'
       - '**.java'
@@ -11,7 +11,7 @@ on:
       - src/**
       - .github/**
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
