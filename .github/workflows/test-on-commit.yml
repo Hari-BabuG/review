@@ -36,7 +36,7 @@ jobs:
           restore-keys: ${{ runner.os }}-maven-
 
       - name: Run unit tests
-        run: mvn clean test
+        run: mvn clean test -Dspring.profiles.active=test -DforkCount=1 -DreuseForks=false -Dsurefire.timeout=120
 
   integration-tests:
     name: Integration Tests
@@ -62,5 +62,4 @@ jobs:
       - name: Run integration tests with Testcontainers
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
-        run: mvn verify
-
+        run: mvn verify -Dspring.profiles.active=test -DforkCount=1 -DreuseForks=false
