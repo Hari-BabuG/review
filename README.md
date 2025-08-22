@@ -49,9 +49,17 @@ Build & Run::
 	
 	# review-service → Spring Boot application
 
-Configuration
+Health API::
 
-Application properties are externalized via application.yml and .env.
+	curl http://localhost:8080/ping
+	
+	curl -H "X-API-Key: changeme" "http://localhost:8080/api/reviews?hotelId=10984&minRating=7.0&page=0&size=10&sort=reviewDate,desc"
+	
+	curl -H "X-API-Key: changeme" "http://localhost:8080/api/reviews/1"
+
+Configuration::
+
+    Application properties are externalized via application.yml and .env.
 
 	Example .env
 		AWS_ACCESS_KEY_ID=dummy
